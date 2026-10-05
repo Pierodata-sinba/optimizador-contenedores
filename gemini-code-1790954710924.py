@@ -1,3 +1,15 @@
+El inconveniente en el selector de rango personalizado ocurre principalmente por tres razones comunes en el comportamiento de st.sidebar.date_input:
+
+Restricción de los límites min_value y max_value: Al fijar min_value y max_value a las fechas encontradas en el archivo actual, Streamlit no permite navegar fuera de ese rango exacto en el calendario.
+
+Selección interactiva incompleta: Cuando un usuario hace clic en el calendario de Streamlit para seleccionar un rango, la variable devuelve temporalmente una lista de 1 solo elemento (solo la fecha de inicio) hasta que se hace clic en la fecha final.
+
+Pérdida de la fecha límite cuando hay registros sin hora: Al comparar fechas sin hora con timestamps, pueden quedar fuera los registros del último día seleccionado.
+
+Código Corregido y Optimizado
+Sustituye todo el código en tu repositorio de GitHub por esta versión. Ahora el selector de fecha permite explorar libremente cualquier mes o año y ajusta dinámicamente los periodos filtrados:
+
+Python
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -23,12 +35,10 @@ if uploaded_file is not None:
         else:
             df = pd.read_excel(uploaded_file)
     except Exception as e:
-        st.error(
-            f"Error al leer el archivo. Si es Excel (.xlsx), asegúrate de tener"
-            f" 'openpyxl' en requirements.txt o sube un archivo CSV: {e}"
-        )
+        st.error(f"Error al leer el archivo: {e}")
         st.stop()
 
+    # Normalización de la columna fecha
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     df = df.dropna(subset=["fecha"])
 
@@ -38,82 +48,95 @@ if uploaded_file is not None:
         )
         st.stop()
 
+    # Determinar rango real de fechas en el archivo
+    min_date_data = df["fecha"].min().date()
+    max_date_data = df["fecha"].max().date()
+
     st.sidebar.header("🗓️ Filtro de Periodo")
     opcion_periodo = st.sidebar.selectbox(
         "Seleccionar tipo de filtro:",
-        ["Semana", "Mes", "Trimestre", "Semestre", "Anual", "Rango de Fechas"],
+        ["Rango Personalizado", "Semana", "Mes", "Trimestre", "Semestre", "Anual"],
     )
 
-    min_date = df["fecha"].min().date()
-    max_date = df["fecha"].max().date()
-
+    # Columnas auxiliares para agrupaciones
     df["Anio"] = df["fecha"].dt.year
-    df["Mes_Nombre"] = df["fecha"].dt.strftime("%B %Y")
+    df["Mes_Nombre"] = df["fecha"].dt.strftime("%Y-%m (%B)")
     df["Semana"] = df["fecha"].dt.to_period("W").astype(str)
     df["Trimestre"] = df["fecha"].dt.to_period("Q").astype(str)
     df["Semestre"] = df["fecha"].apply(
         lambda x: f"{x.year}-H1" if x.month <= 6 else f"{x.year}-H2"
     )
 
-    if opcion_periodo == "Semana":
-        semana_sel = st.sidebar.selectbox(
-            "Seleccionar Semana:", sorted(df["Semana"].unique())
-        )
-        df_filtered = df[df["Semana"] == semana_sel]
-    elif opcion_periodo == "Mes":
-        mes_sel = st.sidebar.selectbox(
-            "Seleccionar Mes:", sorted(df["Mes_Nombre"].unique())
-        )
-        df_filtered = df[df["Mes_Nombre"] == mes_sel]
-    elif opcion_periodo == "Trimestre":
-        tri_sel = st.sidebar.selectbox(
-            "Seleccionar Trimestre:", sorted(df["Trimestre"].unique())
-        )
-        df_filtered = df[df["Trimestre"] == tri_sel]
-    elif opcion_periodo == "Semestre":
-        sem_sel = st.sidebar.selectbox(
-            "Seleccionar Semestre:", sorted(df["Semestre"].unique())
-        )
-        df_filtered = df[df["Semestre"] == sem_sel]
-    elif opcion_periodo == "Anual":
-        anio_sel = st.sidebar.selectbox(
-            "Seleccionar Año:", sorted(df["Anio"].unique())
-        )
-        df_filtered = df[df["Anio"] == anio_sel]
-    else:
+    # Lógica de filtrado de fechas
+    if opcion_periodo == "Rango Personalizado":
         rango_fechas = st.sidebar.date_input(
-            "Rango personalizado:",
-            [min_date, max_date],
-            min_value=min_date,
-            max_value=max_date,
+            "Seleccionar Rango (Inicio - Fin):",
+            value=[min_date_data, max_date_data],
+            # Eliminamos min_value y max_value estrictos para permitir libre navegación en el calendario
         )
-        if len(rango_fechas) == 2:
+
+        if isinstance(rango_fechas, (list, tuple)) and len(rango_fechas) == 2:
             start_date, end_date = rango_fechas
             df_filtered = df[
                 (df["fecha"].dt.date >= start_date)
                 & (df["fecha"].dt.date <= end_date)
             ]
+        elif isinstance(rango_fechas, (list, tuple)) and len(rango_fechas) == 1:
+            st.sidebar.info("👉 Haz clic en la fecha final para completar el rango.")
+            df_filtered = df[df["fecha"].dt.date >= rango_fechas[0]]
         else:
             df_filtered = df.copy()
 
+    elif opcion_periodo == "Semana":
+        semana_sel = st.sidebar.selectbox(
+            "Seleccionar Semana:", sorted(df["Semana"].unique(), reverse=True)
+        )
+        df_filtered = df[df["Semana"] == semana_sel]
+
+    elif opcion_periodo == "Mes":
+        mes_sel = st.sidebar.selectbox(
+            "Seleccionar Mes:", sorted(df["Mes_Nombre"].unique(), reverse=True)
+        )
+        df_filtered = df[df["Mes_Nombre"] == mes_sel]
+
+    elif opcion_periodo == "Trimestre":
+        tri_sel = st.sidebar.selectbox(
+            "Seleccionar Trimestre:", sorted(df["Trimestre"].unique(), reverse=True)
+        )
+        df_filtered = df[df["Trimestre"] == tri_sel]
+
+    elif opcion_periodo == "Semestre":
+        sem_sel = st.sidebar.selectbox(
+            "Seleccionar Semestre:", sorted(df["Semestre"].unique(), reverse=True)
+        )
+        df_filtered = df[df["Semestre"] == sem_sel]
+
+    elif opcion_periodo == "Anual":
+        anio_sel = st.sidebar.selectbox(
+            "Seleccionar Año:", sorted(df["Anio"].unique(), reverse=True)
+        )
+        df_filtered = df[df["Anio"] == anio_sel]
+
     if df_filtered.empty:
         st.warning(
-            "No se encontraron registros de recojo para el periodo"
-            " seleccionado."
+            "No se encontraron registros de recojo para el periodo seleccionado."
         )
         st.stop()
 
     st.info(
-        f"📅 **Periodo evaluado:** Mostrando {len(df_filtered)} registros de"
-        " recojo."
+        f"📅 **Periodo evaluado:** Mostrando {len(df_filtered)} registros de recojo desde "
+        f"**{df_filtered['fecha'].min().strftime('%d/%m/%Y')}** hasta **{df_filtered['fecha'].max().strftime('%d/%m/%Y')}**."
     )
 
     tab1, tab2 = st.tabs(
         ["📉 Análisis Migración 120L", "⚠️ Análisis Déficit / Subutilización"]
     )
 
+    # TAB 1: MIGRACIÓN 120L
     with tab1:
         st.subheader("Evaluación de Factibilidad para Cambio de 180L a 120L")
+        
+        # Agrupación dinámica en función del periodo filtrado
         resumen_120L = (
             df_filtered.groupby(["Cliente", "sede"])
             .agg(
@@ -142,9 +165,7 @@ if uploaded_file is not None:
             else:
                 return "NO FACTIBLE"
 
-        resumen_120L["Dictamen Final"] = resumen_120L.apply(
-            dictamen_120l, axis=1
-        )
+        resumen_120L["Dictamen Final"] = resumen_120L.apply(dictamen_120l, axis=1)
 
         c1, c2, c3 = st.columns(3)
         c1.metric(
@@ -160,7 +181,6 @@ if uploaded_file is not None:
             (resumen_120L["Dictamen Final"] == "NO FACTIBLE").sum(),
         )
 
-        # Formateo compatible tanto con Pandas nuevo (.map) como antiguo (.applymap)
         def color_dictamen(val):
             if val == "100% FACTIBLE":
                 return "background-color: #d4edda; color: #155724"
@@ -191,6 +211,7 @@ if uploaded_file is not None:
         factibles_df = resumen_120L[
             resumen_120L["Dictamen Final"] == "100% FACTIBLE"
         ].sort_values(by="volumen_total", ascending=False)
+        
         if not factibles_df.empty:
             st.subheader("Concentración de Volumen en Sedes Factibles (kg)")
             st.bar_chart(
@@ -200,6 +221,7 @@ if uploaded_file is not None:
                 use_container_width=True,
             )
 
+    # TAB 2: DÉFICIT Y SUBUTILIZACIÓN
     with tab2:
         st.subheader("Detección de Clientes con Subutilización de Contenedores")
         df_filtered["es_deficit"] = (
@@ -219,8 +241,7 @@ if uploaded_file is not None:
         )
 
         resumen_deficit["% Días Déficit"] = (
-            resumen_deficit["dias_con_deficit"]
-            / resumen_deficit["total_recojos"]
+            resumen_deficit["dias_con_deficit"] / resumen_deficit["total_recojos"]
         ) * 100
 
         def clasificar_riesgo(pct):
@@ -240,31 +261,19 @@ if uploaded_file is not None:
         k1, k2, k3, k4 = st.columns(4)
         k1.metric(
             "Riesgo Crítico",
-            (
-                resumen_deficit["Clasificación Riesgo"]
-                == "Crítico (≥75% déficit)"
-            ).sum(),
+            (resumen_deficit["Clasificación Riesgo"] == "Crítico (≥75% déficit)").sum(),
         )
         k2.metric(
             "Riesgo Alto",
-            (
-                resumen_deficit["Clasificación Riesgo"]
-                == "Alto (40%-74% déficit)"
-            ).sum(),
+            (resumen_deficit["Clasificación Riesgo"] == "Alto (40%-74% déficit)").sum(),
         )
         k3.metric(
             "Riesgo Medio",
-            (
-                resumen_deficit["Clasificación Riesgo"]
-                == "Medio (15%-39% déficit)"
-            ).sum(),
+            (resumen_deficit["Clasificación Riesgo"] == "Medio (15%-39% déficit)").sum(),
         )
         k4.metric(
             "Riesgo Bajo / Nulo",
-            (
-                resumen_deficit["Clasificación Riesgo"]
-                == "Bajo / Nulo (<15% déficit)"
-            ).sum(),
+            (resumen_deficit["Clasificación Riesgo"] == "Bajo / Nulo (<15% déficit)").sum(),
         )
 
         st.dataframe(
@@ -277,7 +286,4 @@ if uploaded_file is not None:
         )
 
 else:
-    st.info(
-        "👋 Por favor, sube un archivo CSV o Excel con los datos para comenzar"
-        " el análisis."
-    )
+    st.info("👋 Por favor, sube un archivo CSV o Excel con los datos para comenzar el análisis.")
