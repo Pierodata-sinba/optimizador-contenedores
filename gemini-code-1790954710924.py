@@ -100,10 +100,9 @@ if uploaded_file is not None:
 
         factibles_df = resumen_120L[resumen_120L['Dictamen Final'] == '100% FACTIBLE'].sort_values(by='volumen_total', ascending=False)
         if not factibles_df.empty:
-            fig = px.bar(factibles_df, x='sede', y='volumen_total', color='Cliente',
-                         title="Concentración de Volumen en Sedes Factibles (kg)", labels={'volumen_total': 'Volumen (kg)'})
-            st.plotly_chart(fig, use_container_width=True)
-
+            st.bar_chart(
+    factibles_df.set_index('sede')['volumen_total'], use_container_width=True
+)
     with tab2:
         st.subheader("Detección de Clientes con Subutilización de Contenedores")
         df_filtered['es_deficit'] = df_filtered['contenedores_recogidos'] < df_filtered['contenedores_establecidos']
