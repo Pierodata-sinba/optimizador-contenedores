@@ -2,25 +2,32 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+# Configuración de la página con identidad de Sinba
 st.set_page_config(
-    page_title="Optimizador de Flota y Contenedores", layout="wide"
+    page_title="Sinba | Optimizador de Flota y Contenedores",
+    page_icon="♻️",
+    layout="wide"
 )
 
-st.title("📦 Sistema de Análisis de Capacidad y Uso de Contenedores")
-st.markdown(
-    "Carga tu archivo de recojos para actualizar dinámicamente el análisis de"
-    " migración a **120L** y la **subutilización de flota**."
-)
+# Estilos CSS personalizados basados en el Brandbook de Sinba
+# Paleta de colores principal:
+# Morado (#5A1A9B), Lila (#EBE9FC), Verde (#419847), Rojo (#E05841), Naranja (#F2AC2C), Amarillo (#F5DB22)
+st.markdown("""
+
+""", unsafe_allow_html=True)
+
+# Encabezado principal de la Marca
+st.title("sinba® | Sistema de Análisis de Contenedores")
+st.markdown("### *Por un mundo sin basura* ♻️")
+st.markdown("Carga tu archivo de recojos para actualizar dinámicamente el análisis de migración a **120L** y la **subutilización de flota**.")
 
 uploaded_file = st.sidebar.file_uploader(
     "Subir dataset (CSV o Excel)", type=["csv", "xlsx"]
 )
 
-# Función especializada para interpretar fechas en español y cualquier formato
+# Función para interpretación robusta de fechas en español
 def convertir_fechas_espanol(series):
     s = series.astype(str).str.lower().str.strip()
-    
-    # Mapeo de meses en español (completos y abreviados) a inglés
     reemplazos = {
         'enero': 'Jan', 'ene': 'Jan',
         'febrero': 'Feb', 'feb': 'Feb',
@@ -35,10 +42,8 @@ def convertir_fechas_espanol(series):
         'noviembre': 'Nov', 'nov': 'Nov',
         'diciembre': 'Dec', 'dic': 'Dec'
     }
-    
     for es, en in reemplazos.items():
         s = s.str.replace(es, en, regex=False)
-        
     return pd.to_datetime(s, errors='coerce', dayfirst=True)
 
 if uploaded_file is not None:
@@ -51,17 +56,14 @@ if uploaded_file is not None:
         st.error(f"Error al leer el archivo: {e}")
         st.stop()
 
-    # Normalización robusta de la columna fecha
+    # Normalización de la columna fecha
     df["fecha"] = convertir_fechas_espanol(df["fecha"])
     df = df.dropna(subset=["fecha"])
 
     if df.empty:
-        st.warning(
-            "El archivo cargado no contiene registros con fechas válidas."
-        )
+        st.warning("El archivo cargado no contiene registros con fechas válidas.")
         st.stop()
 
-    # Determinar rango real de fechas en el archivo
     min_date_data = df["fecha"].min().date()
     max_date_data = df["fecha"].max().date()
 
@@ -71,7 +73,6 @@ if uploaded_file is not None:
         ["Rango Personalizado", "Semana", "Mes", "Trimestre", "Semestre", "Anual"],
     )
 
-    # Columnas auxiliares para agrupaciones
     df["Anio"] = df["fecha"].dt.year
     df["Mes_Nombre"] = df["fecha"].dt.strftime("%Y-%m (%B)")
     df["Semana"] = df["fecha"].dt.to_period("W").astype(str)
@@ -80,7 +81,6 @@ if uploaded_file is not None:
         lambda x: f"{x.year}-H1" if x.month <= 6 else f"{x.year}-H2"
     )
 
-    # Lógica de filtrado de fechas
     if opcion_periodo == "Rango Personalizado":
         rango_fechas = st.sidebar.date_input(
             "Seleccionar Rango (Inicio - Fin):",
@@ -130,9 +130,7 @@ if uploaded_file is not None:
         df_filtered = df[df["Anio"] == anio_sel]
 
     if df_filtered.empty:
-        st.warning(
-            "No se encontraron registros de recojo para el periodo seleccionado."
-        )
+        st.warning("No se encontraron registros de recojo para el periodo seleccionado.")
         st.stop()
 
     st.info(
@@ -192,13 +190,14 @@ if uploaded_file is not None:
             (resumen_120L["Dictamen Final"] == "NO FACTIBLE").sum(),
         )
 
-        def color_dictamen(val):
+        # Paleta de colores oficial Sinba
+        def color_dictamen_sinba(val):
             if val == "100% FACTIBLE":
-                return "background-color: #d4edda; color: #155724"
+                return "background-color: #419847; color: #FFFFFF; font-weight: bold;"  # Verde Sinba
             elif val == "NO FACTIBLE":
-                return "background-color: #f8d7da; color: #721c24"
+                return "background-color: #E05841; color: #FFFFFF; font-weight: bold;"  # Rojo Sinba
             else:
-                return "background-color: #fff3cd; color: #856404"
+                return "background-color: #F2AC2C; color: #FFFFFF; font-weight: bold;"  # Naranja Sinba
 
         st_df = resumen_120L[[
             "Cliente",
@@ -213,9 +212,9 @@ if uploaded_file is not None:
         ]].style
 
         if hasattr(st_df, "map"):
-            st_df = st_df.map(color_dictamen, subset=["Dictamen Final"])
+            st_df = st_df.map(color_dictamen_sinba, subset=["Dictamen Final"])
         else:
-            st_df = st_df.applymap(color_dictamen, subset=["Dictamen Final"])
+            st_df = st_df.applymap(color_dictamen_sinba, subset=["Dictamen Final"])
 
         st.dataframe(st_df, use_container_width=True)
 
@@ -229,6 +228,7 @@ if uploaded_file is not None:
                 data=factibles_df,
                 x="sede",
                 y="volumen_total",
+                color="#5A1A9B",  # Morado Sinba
                 use_container_width=True,
             )
 
@@ -298,4 +298,3 @@ if uploaded_file is not None:
 
 else:
     st.info("👋 Por favor, sube un archivo CSV o Excel con los datos para comenzar el análisis.")
-
