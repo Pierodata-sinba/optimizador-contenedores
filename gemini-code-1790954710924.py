@@ -1,15 +1,3 @@
-El inconveniente en el selector de rango personalizado ocurre principalmente por tres razones comunes en el comportamiento de st.sidebar.date_input:
-
-Restricción de los límites min_value y max_value: Al fijar min_value y max_value a las fechas encontradas en el archivo actual, Streamlit no permite navegar fuera de ese rango exacto en el calendario.
-
-Selección interactiva incompleta: Cuando un usuario hace clic en el calendario de Streamlit para seleccionar un rango, la variable devuelve temporalmente una lista de 1 solo elemento (solo la fecha de inicio) hasta que se hace clic en la fecha final.
-
-Pérdida de la fecha límite cuando hay registros sin hora: Al comparar fechas sin hora con timestamps, pueden quedar fuera los registros del último día seleccionado.
-
-Código Corregido y Optimizado
-Sustituye todo el código en tu repositorio de GitHub por esta versión. Ahora el selector de fecha permite explorar libremente cualquier mes o año y ajusta dinámicamente los periodos filtrados:
-
-Python
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -72,7 +60,6 @@ if uploaded_file is not None:
         rango_fechas = st.sidebar.date_input(
             "Seleccionar Rango (Inicio - Fin):",
             value=[min_date_data, max_date_data],
-            # Eliminamos min_value y max_value estrictos para permitir libre navegación en el calendario
         )
 
         if isinstance(rango_fechas, (list, tuple)) and len(rango_fechas) == 2:
@@ -135,8 +122,7 @@ if uploaded_file is not None:
     # TAB 1: MIGRACIÓN 120L
     with tab1:
         st.subheader("Evaluación de Factibilidad para Cambio de 180L a 120L")
-        
-        # Agrupación dinámica en función del periodo filtrado
+
         resumen_120L = (
             df_filtered.groupby(["Cliente", "sede"])
             .agg(
@@ -211,7 +197,7 @@ if uploaded_file is not None:
         factibles_df = resumen_120L[
             resumen_120L["Dictamen Final"] == "100% FACTIBLE"
         ].sort_values(by="volumen_total", ascending=False)
-        
+
         if not factibles_df.empty:
             st.subheader("Concentración de Volumen en Sedes Factibles (kg)")
             st.bar_chart(
