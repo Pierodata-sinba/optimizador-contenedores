@@ -17,13 +17,26 @@ uploaded_file = st.sidebar.file_uploader(
 )
 
 if uploaded_file is not None:
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file)
+    try:
+        if uploaded_file.name.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
+    except Exception as e:
+        st.error(
+            f"Error al leer el archivo. Si es Excel (.xlsx), asegúrate de tener"
+            f" 'openpyxl' en requirements.txt o sube un archivo CSV: {e}"
+        )
+        st.stop()
 
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     df = df.dropna(subset=["fecha"])
+
+    if df.empty:
+        st.warning(
+            "El archivo cargado no contiene registros con fechas válidas."
+        )
+        st.stop()
 
     st.sidebar.header("🗓️ Filtro de Periodo")
     opcion_periodo = st.sidebar.selectbox(
@@ -83,6 +96,13 @@ if uploaded_file is not None:
         else:
             df_filtered = df.copy()
 
+    if df_filtered.empty:
+        st.warning(
+            "No se encontraron registros de recojo para el periodo"
+            " seleccionado."
+        )
+        st.stop()
+
     st.info(
         f"📅 **Periodo evaluado:** Mostrando {len(df_filtered)} registros de"
         " recojo."
@@ -140,31 +160,33 @@ if uploaded_file is not None:
             (resumen_120L["Dictamen Final"] == "NO FACTIBLE").sum(),
         )
 
-        st.dataframe(
-            resumen_120L[[
-                "Cliente",
-                "sede",
-                "total_dias",
-                "contenedores_est",
-                "capacidad_120L",
-                "peso_p90",
-                "peso_max",
-                "volumen_total",
-                "Dictamen Final",
-            ]].style.applymap(
-                lambda v: (
-                    "background-color: #d4edda; color: #155724"
-                    if v == "100% FACTIBLE"
-                    else (
-                        "background-color: #f8d7da; color: #721c24"
-                        if v == "NO FACTIBLE"
-                        else "background-color: #fff3cd; color: #856404"
-                    )
-                ),
-                subset=["Dictamen Final"],
-            ),
-            use_container_width=True,
-        )
+        # Formateo compatible tanto con Pandas nuevo (.map) como antiguo (.applymap)
+        def color_dictamen(val):
+            if val == "100% FACTIBLE":
+                return "background-color: #d4edda; color: #155724"
+            elif val == "NO FACTIBLE":
+                return "background-color: #f8d7da; color: #721c24"
+            else:
+                return "background-color: #fff3cd; color: #856404"
+
+        st_df = resumen_120L[[
+            "Cliente",
+            "sede",
+            "total_dias",
+            "contenedores_est",
+            "capacidad_120L",
+            "peso_p90",
+            "peso_max",
+            "volumen_total",
+            "Dictamen Final",
+        ]].style
+
+        if hasattr(st_df, "map"):
+            st_df = st_df.map(color_dictamen, subset=["Dictamen Final"])
+        else:
+            st_df = st_df.applymap(color_dictamen, subset=["Dictamen Final"])
+
+        st.dataframe(st_df, use_container_width=True)
 
         factibles_df = resumen_120L[
             resumen_120L["Dictamen Final"] == "100% FACTIBLE"
