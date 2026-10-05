@@ -1,5 +1,4 @@
-# Verify code syntax and structure
-full_code = '''import numpy as np
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -9,32 +8,13 @@ st.set_page_config(
 
 st.title("📦 Sistema de Análisis de Capacidad y Uso de Contenedores")
 st.markdown(
-    "Carga tu archivo de recojos para actualizar dinámicamente el análisis de migración a **120L** y la **subutilización de flota**."
+    "Carga tu archivo de recojos para actualizar dinámicamente el análisis de"
+    " migración a **120L** y la **subutilización de flota**."
 )
 
 uploaded_file = st.sidebar.file_uploader(
     "Subir dataset (CSV o Excel)", type=["csv", "xlsx"]
 )
-
-def convertir_fechas_espanol(series):
-    s = series.astype(str).str.lower().str.strip()
-    reemplazos = {
-        'enero': 'Jan', 'ene': 'Jan',
-        'febrero': 'Feb', 'feb': 'Feb',
-        'marzo': 'Mar', 'mar': 'Mar',
-        'abril': 'Apr', 'abr': 'Apr',
-        'mayo': 'May', 'may': 'May',
-        'junio': 'Jun', 'jun': 'Jun',
-        'julio': 'Jul', 'jul': 'Jul',
-        'agosto': 'Aug', 'ago': 'Aug',
-        'septiembre': 'Sep', 'setiembre': 'Sep', 'sep': 'Sep', 'set': 'Sep',
-        'octubre': 'Oct', 'oct': 'Oct',
-        'noviembre': 'Nov', 'nov': 'Nov',
-        'diciembre': 'Dec', 'dic': 'Dec'
-    }
-    for es, en in reemplazos.items():
-        s = s.str.replace(es, en, regex=False)
-    return pd.to_datetime(s, errors='coerce', dayfirst=True)
 
 if uploaded_file is not None:
     try:
@@ -46,13 +26,17 @@ if uploaded_file is not None:
         st.error(f"Error al leer el archivo: {e}")
         st.stop()
 
-    df["fecha"] = convertir_fechas_espanol(df["fecha"])
+    # Normalización de la columna fecha
+    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     df = df.dropna(subset=["fecha"])
 
     if df.empty:
-        st.warning("El archivo cargado no contiene registros con fechas válidas.")
+        st.warning(
+            "El archivo cargado no contiene registros con fechas válidas."
+        )
         st.stop()
 
+    # Determinar rango real de fechas en el archivo
     min_date_data = df["fecha"].min().date()
     max_date_data = df["fecha"].max().date()
 
@@ -62,6 +46,7 @@ if uploaded_file is not None:
         ["Rango Personalizado", "Semana", "Mes", "Trimestre", "Semestre", "Anual"],
     )
 
+    # Columnas auxiliares para agrupaciones
     df["Anio"] = df["fecha"].dt.year
     df["Mes_Nombre"] = df["fecha"].dt.strftime("%Y-%m (%B)")
     df["Semana"] = df["fecha"].dt.to_period("W").astype(str)
@@ -70,6 +55,7 @@ if uploaded_file is not None:
         lambda x: f"{x.year}-H1" if x.month <= 6 else f"{x.year}-H2"
     )
 
+    # Lógica de filtrado de fechas
     if opcion_periodo == "Rango Personalizado":
         rango_fechas = st.sidebar.date_input(
             "Seleccionar Rango (Inicio - Fin):",
@@ -119,7 +105,9 @@ if uploaded_file is not None:
         df_filtered = df[df["Anio"] == anio_sel]
 
     if df_filtered.empty:
-        st.warning("No se encontraron registros de recojo para el periodo seleccionado.")
+        st.warning(
+            "No se encontraron registros de recojo para el periodo seleccionado."
+        )
         st.stop()
 
     st.info(
@@ -131,6 +119,7 @@ if uploaded_file is not None:
         ["📉 Análisis Migración 120L", "⚠️ Análisis Déficit / Subutilización"]
     )
 
+    # TAB 1: MIGRACIÓN 120L
     with tab1:
         st.subheader("Evaluación de Factibilidad para Cambio de 180L a 120L")
 
@@ -218,6 +207,7 @@ if uploaded_file is not None:
                 use_container_width=True,
             )
 
+    # TAB 2: DÉFICIT Y SUBUTILIZACIÓN
     with tab2:
         st.subheader("Detección de Clientes con Subutilización de Contenedores")
         df_filtered["es_deficit"] = (
@@ -283,7 +273,3 @@ if uploaded_file is not None:
 
 else:
     st.info("👋 Por favor, sube un archivo CSV o Excel con los datos para comenzar el análisis.")
-'''
-
-compile(full_code, '', 'exec')
-print("Code validation successful!")
