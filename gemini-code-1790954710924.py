@@ -16,6 +16,31 @@ uploaded_file = st.sidebar.file_uploader(
     "Subir dataset (CSV o Excel)", type=["csv", "xlsx"]
 )
 
+# Función especializada para interpretar fechas en español y cualquier formato
+def convertir_fechas_espanol(series):
+    s = series.astype(str).str.lower().str.strip()
+    
+    # Mapeo de meses en español (completos y abreviados) a inglés
+    reemplazos = {
+        'enero': 'Jan', 'ene': 'Jan',
+        'febrero': 'Feb', 'feb': 'Feb',
+        'marzo': 'Mar', 'mar': 'Mar',
+        'abril': 'Apr', 'abr': 'Apr',
+        'mayo': 'May', 'may': 'May',
+        'junio': 'Jun', 'jun': 'Jun',
+        'julio': 'Jul', 'jul': 'Jul',
+        'agosto': 'Aug', 'ago': 'Aug',
+        'septiembre': 'Sep', 'setiembre': 'Sep', 'sep': 'Sep', 'set': 'Sep',
+        'octubre': 'Oct', 'oct': 'Oct',
+        'noviembre': 'Nov', 'nov': 'Nov',
+        'diciembre': 'Dec', 'dic': 'Dec'
+    }
+    
+    for es, en in reemplazos.items():
+        s = s.str.replace(es, en, regex=False)
+        
+    return pd.to_datetime(s, errors='coerce', dayfirst=True)
+
 if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith(".csv"):
@@ -26,8 +51,8 @@ if uploaded_file is not None:
         st.error(f"Error al leer el archivo: {e}")
         st.stop()
 
-    # Normalización de la columna fecha
-    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+    # Normalización robusta de la columna fecha
+    df["fecha"] = convertir_fechas_espanol(df["fecha"])
     df = df.dropna(subset=["fecha"])
 
     if df.empty:
@@ -273,3 +298,4 @@ if uploaded_file is not None:
 
 else:
     st.info("👋 Por favor, sube un archivo CSV o Excel con los datos para comenzar el análisis.")
+
